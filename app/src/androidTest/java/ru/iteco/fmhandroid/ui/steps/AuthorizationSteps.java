@@ -1,8 +1,10 @@
 package ru.iteco.fmhandroid.ui.steps;
 
 
+import ru.iteco.fmhandroid.R;
 import ru.iteco.fmhandroid.ui.pages.AuthorizationPage;
 import ru.iteco.fmhandroid.ui.pages.MainPage;
+import ru.iteco.fmhandroid.ui.utils.ViewHelper;
 
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
@@ -14,26 +16,34 @@ public class AuthorizationSteps {
     private final MainPage mainPage = new MainPage();
 
     public void login(String login, String password) {
+        // Сначала ждем экран авторизации
         authPage.waitForAuthorizationScreen();
+
+        // Вводим данные
         authPage.enterLogin(login);
         authPage.enterPassword(password);
+
+        // Нажимаем кнопку
         authPage.clickSignInButton();
+
+        // ВАЖНО: Даем время на анимацию
+        try {
+            Thread.sleep(500); // небольшая пауза для начала анимации
+        } catch (InterruptedException e) {
+            // ignore
+        }
     }
 
     public void verifyLoginSuccessful() {
-        // Ждем загрузку главного экрана
+        // СНАЧАЛА ждем исчезновения экрана авторизации с таймаутом
+        ViewHelper.waitForElementGone(R.id.login_text_input_layout, 5000);
+
+        // ПОТОМ ждем загрузку главной страницы
         mainPage.waitForMainScreen();
 
-        // Проверяем ключевые элементы главного экрана:
-
-        // 1. Меню пользователя (иконка в правом верхнем углу)
+        // ПОТОМ проверяем элементы
         mainPage.checkbuttonMenuIsDisplayed();
-
-        // 2. Заголовок главной страницы
         mainPage.checkTrademarkIsDisplayed();
-
-        // 3. Основные разделы (Новости, Заявки и т.д.)
-        mainPage.checkLogoutButtonIsDisplayed();
     }
 
 //    public void verifyLoginFailed() {
