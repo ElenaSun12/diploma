@@ -15,6 +15,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.is;
 
+import android.view.View;
+
 import androidx.test.espresso.IdlingResource;
 import androidx.test.espresso.ViewInteraction;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
@@ -37,14 +39,18 @@ public class LoginEspressoTest {
     public ActivityScenarioRule<AppActivity> mActivityScenarioRule =
             new ActivityScenarioRule<>(AppActivity.class);
 
-    // === ПРОСТОЙ IdlingResource для ожидания ПОЯВЛЕНИЯ элемента ===
     private static class ViewAppearedIdlingResource implements IdlingResource {
         private final int viewId;
+        private final ActivityScenarioRule<AppActivity> activityScenarioRule;
         private ResourceCallback resourceCallback;
         private boolean isIdle = false;
 
-        public ViewAppearedIdlingResource(int viewId) {
+        public ViewAppearedIdlingResource(
+                int viewId,
+                ActivityScenarioRule<AppActivity> activityScenarioRule
+        ) {
             this.viewId = viewId;
+            this.activityScenarioRule = activityScenarioRule;
         }
 
         @Override
@@ -56,17 +62,21 @@ public class LoginEspressoTest {
         public boolean isIdleNow() {
             if (isIdle) return true;
 
-            try {
-                // Ждём, пока элемент станет видимым
-                onView(withId(viewId)).check(matches(isDisplayed()));
+            boolean[] isViewVisible = {false};
+
+            // ✅ Проверяем видимость НАПРЯМУЮ через Activity
+            activityScenarioRule.getScenario().onActivity(activity -> {
+                View view = activity.findViewById(viewId);
+                isViewVisible[0] = view != null && view.isShown();
+            });
+
+            if (isViewVisible[0]) {
                 isIdle = true;
                 if (resourceCallback != null) {
                     resourceCallback.onTransitionToIdle();
                 }
-                return true;
-            } catch (Exception e) {
-                return false; // Продолжаем ждать
             }
+            return isIdle;
         }
 
         @Override
@@ -74,6 +84,43 @@ public class LoginEspressoTest {
             this.resourceCallback = callback;
         }
     }
+//    // === ПРОСТОЙ IdlingResource для ожидания ПОЯВЛЕНИЯ элемента ===
+//    private static class ViewAppearedIdlingResource implements IdlingResource {
+//        private final int viewId;
+//        private ResourceCallback resourceCallback;
+//        private boolean isIdle = false;
+//
+//        public ViewAppearedIdlingResource(int viewId) {
+//            this.viewId = viewId;
+//        }
+//
+//        @Override
+//        public String getName() {
+//            return "ViewAppeared:" + viewId;
+//        }
+//
+//        @Override
+//        public boolean isIdleNow() {
+//            if (isIdle) return true;
+//
+//            try {
+//                // Ждём, пока элемент станет видимым
+//                onView(withId(viewId)).check(matches(isDisplayed()));
+//                isIdle = true;
+//                if (resourceCallback != null) {
+//                    resourceCallback.onTransitionToIdle();
+//                }
+//                return true;
+//            } catch (Exception e) {
+//                return false; // Продолжаем ждать
+//            }
+//        }
+//
+//        @Override
+//        public void registerIdleTransitionCallback(ResourceCallback callback) {
+//            this.resourceCallback = callback;
+//        }
+//    }
 
     // === ПРОСТОЙ IdlingResource для ожидания ИСЧЕЗНОВЕНИЯ элемента ===
     private static class ViewGoneIdlingResource implements IdlingResource {
@@ -118,11 +165,21 @@ public class LoginEspressoTest {
 
     @Before
     public void setUp() {
-        // === ЭТАП 1 → 2: Ждём ПОЯВЛЕНИЯ КНОПКИ SIGN IN (R.id.enter_button) ===
-        // Это надёжная точка — кнопка появляется ПОСЛЕДНЕЙ, когда экран входа полностью готов
-        loginScreenIdlingResource = new ViewAppearedIdlingResource(R.id.enter_button);
+        // Передаем mActivityScenarioRule в конструктор
+        loginScreenIdlingResource = new ViewAppearedIdlingResource(
+                R.id.enter_button,
+                mActivityScenarioRule // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+        );
         registerIdlingResources(loginScreenIdlingResource);
     }
+
+//    @Before
+//    public void setUp() {
+//        // === ЭТАП 1 → 2: Ждём ПОЯВЛЕНИЯ КНОПКИ SIGN IN (R.id.enter_button) ===
+//        // Это надёжная точка — кнопка появляется ПОСЛЕДНЕЙ, когда экран входа полностью готов
+//        loginScreenIdlingResource = new ViewAppearedIdlingResource(R.id.enter_button);
+//        registerIdlingResources(loginScreenIdlingResource);
+//    }
 
     @After
     public void tearDown() {
