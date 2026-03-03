@@ -7,6 +7,7 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withClassName;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
@@ -16,6 +17,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.is;
 
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.test.espresso.IdlingResource;
 import androidx.test.espresso.ViewInteraction;
@@ -29,6 +31,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
+
 import ru.iteco.fmhandroid.R;
 
 @LargeTest
@@ -38,6 +44,54 @@ public class LoginEspressoTest {
     @Rule
     public ActivityScenarioRule<AppActivity> mActivityScenarioRule =
             new ActivityScenarioRule<>(AppActivity.class);
+//закомм 03,03---------
+//    private static class ViewAppearedIdlingResource implements IdlingResource {
+//        private final int viewId;
+//        private final ActivityScenarioRule<AppActivity> activityScenarioRule;
+//        private ResourceCallback resourceCallback;
+//        private boolean isIdle = false;
+//
+//        public ViewAppearedIdlingResource(
+//                int viewId,
+//                ActivityScenarioRule<AppActivity> activityScenarioRule
+//        ) {
+//            this.viewId = viewId;
+//            this.activityScenarioRule = activityScenarioRule;
+//        }
+//
+//        @Override
+//        public String getName() {
+//            return "ViewAppeared:" + viewId;
+//        }
+//
+//        @Override
+//        public boolean isIdleNow() {
+//            if (isIdle) return true;
+//
+//            boolean[] isViewVisible = {false};
+//
+//            // ✅ Проверяем видимость НАПРЯМУЮ через Activity
+//            activityScenarioRule.getScenario().onActivity(activity -> {
+//                View view = activity.findViewById(viewId);
+//                isViewVisible[0] = view != null && view.isShown();
+//            });
+//
+//            if (isViewVisible[0]) {
+//                isIdle = true;
+//                if (resourceCallback != null) {
+//                    resourceCallback.onTransitionToIdle();
+//                }
+//            }
+//            return isIdle;
+//        }
+//
+//        @Override
+//        public void registerIdleTransitionCallback(ResourceCallback callback) {
+//            this.resourceCallback = callback;
+//        }
+//    }
+
+    //закомм низ 03.03
 
     private static class ViewAppearedIdlingResource implements IdlingResource {
         private final int viewId;
@@ -64,7 +118,7 @@ public class LoginEspressoTest {
 
             boolean[] isViewVisible = {false};
 
-            // ✅ Проверяем видимость НАПРЯМУЮ через Activity
+            // ✅ ПРЯМАЯ проверка через Activity — БЕЗ onView()
             activityScenarioRule.getScenario().onActivity(activity -> {
                 View view = activity.findViewById(viewId);
                 isViewVisible[0] = view != null && view.isShown();
@@ -84,6 +138,8 @@ public class LoginEspressoTest {
             this.resourceCallback = callback;
         }
     }
+
+    //   ----------------
 //    // === ПРОСТОЙ IdlingResource для ожидания ПОЯВЛЕНИЯ элемента ===
 //    private static class ViewAppearedIdlingResource implements IdlingResource {
 //        private final int viewId;
@@ -165,14 +221,30 @@ public class LoginEspressoTest {
 
     @Before
     public void setUp() {
-        // Передаем mActivityScenarioRule в конструктор
+        // Сначала ждем, пока Activity полностью загрузится
+        mActivityScenarioRule.getScenario().onActivity(activity -> {
+            // Пустое действие - просто ждем готовности Activity
+        });
+
+        // Только после этого регистрируем IdlingResource
         loginScreenIdlingResource = new ViewAppearedIdlingResource(
-                R.id.enter_button,
-                mActivityScenarioRule // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+                R.id.login_text_input_layout, //поменяла  R.id.enter_button на R.id.login_text_input_layout
+                mActivityScenarioRule
         );
         registerIdlingResources(loginScreenIdlingResource);
     }
 
+//ниже - второй вариант. Не работает, т к сразу ищет enter_button, уже при splash screen /03.03 закомм
+//    @Before
+//    public void setUp() {
+//        // Передаем mActivityScenarioRule в конструктор
+//        loginScreenIdlingResource = new ViewAppearedIdlingResource(
+//                R.id.enter_button,
+//                mActivityScenarioRule // <-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+//        );
+//        registerIdlingResources(loginScreenIdlingResource);
+//    }
+//ниже - первый вариант
 //    @Before
 //    public void setUp() {
 //        // === ЭТАП 1 → 2: Ждём ПОЯВЛЕНИЯ КНОПКИ SIGN IN (R.id.enter_button) ===
@@ -192,20 +264,32 @@ public class LoginEspressoTest {
     public void loginEspressoTest() {
         // === ЭТАП 2: Экран входа готов (кнопка SIGN IN видна) ===
         // Теперь проверяем и заполняем поля логина/пароля
-        onView(
-                allOf(
-                        withClassName(is("android.widget.EditText")),
-                        withParent(withId(R.id.login_text_input_layout))
-                )
-        ).check(matches(isDisplayed()))
+
+        //закомм 03.03, новый вариант - ниже, с поиском EditText ВНУТРИ login_text_input_layout (на любом уровне вложенности)
+//        onView(
+//                allOf(
+//                        withClassName(is("android.widget.EditText")),
+//                        withParent(withId(R.id.login_text_input_layout))
+//                )
+//        ).check(matches(isDisplayed()))
+//                .perform(replaceText("login2"), closeSoftKeyboard());
+
+        // Поиск EditText ВНУТРИ login_text_input_layout (на любом уровне вложенности)
+
+        onView(allOf(
+                withClassName(is("android.widget.EditText")),
+                isDescendantOfA(withId(R.id.login_text_input_layout))
+        ))
+                .check(matches(isDisplayed()))
                 .perform(replaceText("login2"), closeSoftKeyboard());
 
         onView(
                 allOf(
                         withClassName(is("android.widget.EditText")),
-                        withParent(withId(R.id.password_text_input_layout))
+                        isDescendantOfA(withId(R.id.password_text_input_layout))
                 )
-        ).check(matches(isDisplayed()))
+        )
+                .check(matches(isDisplayed()))
                 .perform(replaceText("password2"), closeSoftKeyboard());
 
         // Нажимаем кнопку входа
@@ -224,8 +308,31 @@ public class LoginEspressoTest {
             unregisterIdlingResources(goneResource);
         }
     }
-}
 
+    public static Matcher<View> withDescendant(final Matcher<View> descendantMatcher) {
+        return new TypeSafeMatcher<View>() {
+            @Override
+            public void describeTo(Description description) {
+                description.appendText("with descendant: ");
+                descendantMatcher.describeTo(description);
+            }
+
+            @Override
+            public boolean matchesSafely(View view) {
+                if (!(view instanceof ViewGroup)) {
+                    return false;
+                }
+                ViewGroup group = (ViewGroup) view;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    if (descendantMatcher.matches(group.getChildAt(i))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+    }
+}
 
 //закоммментила 23.02, верх. Вариант с простым исправлениями (рефакторинг еспрессо вараинта). Поиск по логину
 // package ru.iteco.fmhandroid.ui;
